@@ -1,0 +1,37 @@
+# TODO: why equal on some and blank on others?
+ENV NPM_CONFIG_LOGLEVEL warn
+ENV NPM_CONFIG_PREFIX=/node_modules
+ENV PATH=$PATH:/node_modules/.bin
+ENV APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE False
+# TODO: should this be here or in base? 
+ENV PIP_NO_BINARY=psycopg2
+
+# Install ligbnetls30, needed workaround for this issue to install nodesource:  https://github.com/nodesource/distributions/issues/1266
+# TODO: see if this is still needed
+#RUN apt update && apt install libgnutls30
+
+# Install nodejs from nodesource
+# TODO: is there a way to pin this to a particular version?
+RUN <<EOF
+  DISTRO="$(lsb_release -s -c)"
+  echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections 
+  echo "deb https://deb.nodesource.com/node_14.x ${DISTRO} main" > /etc/apt/sources.list.d/nodesource.list
+  wget -qO- https://deb.nodesource.com/gpgkey/nodesource.gpg.key | apt-key add - 
+  apt-get -qq update
+  apt-get -qq install nodejs > /dev/null
+  rm -rf /var/lib/apt/lists/*
+EOF
+
+WORKDIR /
+
+# we installed everything else in the base image; this installs the dev deps
+RUN poetry install
+
+COPY node /node
+WORKDIR /node
+
+RUN <<EOF
+  npm install
+  mv node_modules /
+EOF
+WORKDIR /
